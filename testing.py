@@ -3,7 +3,7 @@ import requests
 import sha
 
 def decode(file):
-    torrent = bencode.bdecode(open('Sapolsky.mp4.torrent', 'rb').read())
+    torrent = bencode.bdecode(open(file, 'rb').read())
     return torrent
 
 def announce(file):
@@ -22,7 +22,14 @@ def announce(file):
 
     response = requests.get(torrent['announce'], params = payload)
     print response.content
-    print response.url
+    reply = bencode.bdecode(response.content)
+    print reply.keys()
+    print 'peers: ' + str(reply['peers'])
+    print 'min interval: ' + str(reply['min interval'])
+    print 'complete: ' + str(reply['complete'])
+    print 'interval: ' + str(reply['interval'])
+    print 'downloaded: ' + str(reply['downloaded'])
+    print 'incomplete: ' + str(reply['incomplete'])
 
 
 def getdicthash(file):
