@@ -9,6 +9,11 @@ def decode(file):
     torrent = bencode.bdecode(open(file, 'rb').read())
     return torrent
 
+def handshake(file):
+    info_hash = getdicthash(file)
+    # open a socket, send this:
+    return chr(19) + 'BitTorrent Protocol' + '\0'*8 + info_hash + '-TR2610-dfhmjb0skee6'
+
 def announce(file):
     info_hash = getdicthash(file)
     torrent = decode(file)
@@ -37,7 +42,18 @@ def announce(file):
     data = reply['peers']
     multiple = len(data)/6
     print struct.unpack("!" + "LH"*multiple, data)
-    print socket.inet_ntop(socket.AF_INET, data[0:4]) + ":" + repr(struct.unpack("!H", data[4:6])[0])
+    for i in range(0, multiple):
+        print socket.inet_ntop(socket.AF_INET, data[6*i:6*i+4]) + ":" + repr(struct.unpack("!H", data[6*i+4:6*i+6])[0])
+    ip =  socket.inet_ntop(socket.AF_INET, data[0:4])
+    port = int(repr(struct.unpack("!H", data[4:6])[0]))
+
+    msg = handshake('Sapolsky.mp4.torrent')
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+    s.connect((ip, 51413))
+    s.send(msg)
+    print repr(msg)
+    print "Received: %s" % s.recv(1024)
     
 
 def getdicthash(file):
@@ -51,16 +67,21 @@ def getdicthash(file):
 
 
 
-announce('kubuntu.torrent')
+announce('Sapolsky.mp4.torrent')
 
 
 def spliceshas(torrent):
+    tor = bencode.bdecode(open(torrent, 'rb').read()) 
+    print tor['info'].keys()
+    pieces = tor['info']['pieces']
     pieceshas = []
 
     for i in range(len(pieces)/20):
        pieceshas.append(pieces[20*i:20*(i+1)])
 
     print pieceshas[0:3]
+
+
 
 
 '''
@@ -80,13 +101,13 @@ if __name__ == '__main__':
     for peer in peerList
         fac.buildProtocol(peer)
 
-
+'''
 def handshake(file):
     info_hash = getdicthash(file)
     # open a socket, send this:
-    chr(19) + 'BitTorrent Protocol' + '\x00'*8 + info_hash + '-TR2610-dfhmjb0skee6'
+    return chr(19) + 'BitTorrent Protocol' + '\x00'*8 + info_hash + '-TR2610-dfhmjb0skee6'
 
-
+'''
 
 
 def message(peer, length, id, payload):
