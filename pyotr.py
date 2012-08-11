@@ -6,6 +6,7 @@ import socket
 import Queue
 import threading
 import time
+import random
 
 ''' Metainfo '''
 
@@ -17,8 +18,6 @@ def decode(file_load):
 
 def splice_shas(torrent):
     ''' Splices the SHA1 keys into a list '''
-    print metainfo['info'].keys()
-    print metainfo['info']['piece length']
     pieces = metainfo['info']['pieces']
     sha_list = []
 
@@ -73,17 +72,29 @@ def announce(file_load):
                'event':'started',
                'compact':'1',
                'numwant':'30'}
-
+    
+    print "Announcing to tracker in:"
+    print "3"
+    time.sleep(1)
+    print "2"
+    time.sleep(1)
+    print "1.."
+    time.sleep(1)
+    print "go!"
     response = requests.get(torrent['announce'], params = payload)
     reply = bencode.bdecode(response.content)
+    print ""
+    print ""
+    print "Response received, decoded.."
     print 'peers: ' + repr(reply['peers'])
     print 'complete: ' + str(reply['complete'])
     print 'interval: ' + str(reply['interval'])
     print 'incomplete: ' + str(reply['incomplete'])
-    
+    print ""
+    print ""
     data = reply['peers']
     multiple = len(data)/6
-    print struct.unpack("!" + "LH"*multiple, data)
+    #print struct.unpack("!" + "LH"*multiple, data)
     for i in range(0, multiple):
         print socket.inet_ntop(socket.AF_INET, data[6*i:6*i+4]) + ":" + repr(struct.unpack("!H", data[6*i+4:6*i+6])[0])
     ip =  socket.inet_ntop(socket.AF_INET, data[0:4])
@@ -106,10 +117,12 @@ def handshake(socket):
     ''' Initiates handshake with peer '''
     info_hash = getdicthash('Sapolsky.mp4.torrent')    
     msg = chr(19) + 'BitTorrent protocol' + '\x00'*8 + info_hash + '-PYOTR0-dfhmjb0skee6'
+    print ""
+    print "Beginning handshake with peer"
     socket.send(msg)
     print "Handshake sent: ", repr(msg)
     print "Handshake rcvd: %s" % repr(socket.recv(4096))
-
+    print ""
 
 def make_have(piece):
     ''' Constructs msg for sending a 'have piece' msg to a peer '''
@@ -159,19 +172,20 @@ def receive_loop(index, socket):
     last_req_length = 16384
     while True:
         flag, data = flagmsg(socket)
-        print flag
+        print "Message type:", flag
         if flag == 'bitfield':
             num = int(data.encode('hex'), 16)
             bitfield = bin(num)[2:len(sha_list)+2]
             bfield = [ (True if x == '1' else False) for x in bitfield ]
             print bitfield
-            print bfield[0:10]
             time.sleep(2)
-            print "... as you can see, it's a seeder!"
-            time.sleep(5)
+            print ""
+            print "This peer is a seeder"
+            time.sleep(2)
         elif flag == 'unchoke':
             ''' If unchoked, send a request! '''
-            print 'unchoked!'
+            print 'Peer unchoked us!'
+            print 'Requesting block'
             socket.sendall(make_request(index, 0, 16384))
             last_req_length = 16384
             # we don't actually need this, can get from length of data. attribute it?
@@ -180,7 +194,8 @@ def receive_loop(index, socket):
             print repr(data[:20])
             print "Piece Index: ", piece 
             print "Offset:", offset
-            print "Length sent:",len(data[8:])
+            print ""  
+            #print "Length sent:",len(data[8:])
             piece_data[offset:offset+last_req_length] = data[8:]
             if None not in piece_data:
                 print "yay! finished a piece!"
@@ -215,13 +230,21 @@ class PeerConnection(threading.Thread):
             piece_sha = sha.new(current_piece).digest()
             if now_sha == piece_sha:
                 print "SHA1 matches for piece", index
+                print ""
                 self.s.sendall(make_have(index))
                 self.piece_queue.task_done()
-            else: print "FAILED CHECKSUM :("
+            else: 
+                print "Failed SHA1 check :("
+                print ""
+                failed = index, now_sha
+                self.piece_queue.task_done()
+                self.piece_queue.put(failed)
 
 
 ''' MAIN '''
 file_load = 'Sapolsky.mp4.torrent'
+print "Loaded", file_load
+print ""
 
 piece_queue = Queue.Queue()
 metainfo = decode(file_load)
@@ -231,6 +254,9 @@ piece_length = metainfo['info']['piece length']
 
 sha_list = splice_shas(file_load)
 piece_list = zip([x for x in range(len(sha_list))], sha_list)
+random.shuffle(piece_list)
+print "Pieces currently download in random order. Shuffling into queue.."
+time.sleep(1)
 for piece in piece_list:
     piece_queue.put(piece)
 
@@ -238,6 +264,8 @@ for piece in piece_list:
 ip, port = announce(file_load)
 
 
+print "Spinning up two threads. One will fail, since peer won't take two connections."
+print ""
 for i in range(2):
     t = PeerConnection(piece_queue, ip, 51413)
     t.setDaemon(True)
