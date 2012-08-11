@@ -95,8 +95,10 @@ def announce(file_load):
     data = reply['peers']
     multiple = len(data)/6
     #print struct.unpack("!" + "LH"*multiple, data)
+    print "Converting 'peers' to more readable form:"
     for i in range(0, multiple):
         print socket.inet_ntop(socket.AF_INET, data[6*i:6*i+4]) + ":" + repr(struct.unpack("!H", data[6*i+4:6*i+6])[0])
+    print ""
     ip =  socket.inet_ntop(socket.AF_INET, data[0:4])
     port = int(repr(struct.unpack("!H", data[4:6])[0]))
     return (ip, port)
@@ -181,11 +183,14 @@ def receive_loop(index, socket):
             time.sleep(2)
             print ""
             print "This peer is a seeder"
+            print ""
             time.sleep(2)
         elif flag == 'unchoke':
             ''' If unchoked, send a request! '''
             print 'Peer unchoked us!'
+            time.sleep(1)
             print 'Requesting block'
+            print ""
             socket.sendall(make_request(index, 0, 16384))
             last_req_length = 16384
             # we don't actually need this, can get from length of data. attribute it?
