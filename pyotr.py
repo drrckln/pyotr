@@ -46,8 +46,8 @@ def recvall(socket, expected):
     while True:
         newdata = socket.recv(expected)
         data += newdata
-        expected = expected - len(newdata)
-        if expected == 0:
+        expected -= len(newdata)
+        if not expected:
             break
     return data
 
@@ -74,31 +74,27 @@ def announce(file_load):
                'numwant':'30'}
     
     print "Announcing to tracker in:"
-    print "3"
-    time.sleep(1)
-    print "2"
-    time.sleep(1)
-    print "1.."
-    time.sleep(1)
-    print "go!"
+    for count_down in range(3, 0, -1):
+        time.sleep(1)
+        print count_down
+    
     response = requests.get(torrent['announce'], params = payload)
     reply = bencode.bdecode(response.content)
-    print ""
-    print ""
-    print "Response received, decoded.."
-    print 'peers: ' + repr(reply['peers'])
-    print 'complete: ' + str(reply['complete'])
-    print 'interval: ' + str(reply['interval'])
-    print 'incomplete: ' + str(reply['incomplete'])
-    print ""
-    print ""
+    print("""
+Response received, decoded..
+peers: {0}
+complete: {1}
+interval: {2}
+incomplete: {3}
+""".format(repr(reply['peers']), reply['complete'], reply['interval'], reply['incomplete']))
+
     data = reply['peers']
     multiple = len(data)/6
     #print struct.unpack("!" + "LH"*multiple, data)
     print "Converting 'peers' to more readable form:"
     for i in range(0, multiple):
         print socket.inet_ntop(socket.AF_INET, data[6*i:6*i+4]) + ":" + repr(struct.unpack("!H", data[6*i+4:6*i+6])[0])
-    print ""
+    print
     ip =  socket.inet_ntop(socket.AF_INET, data[0:4])
     port = int(repr(struct.unpack("!H", data[4:6])[0]))
     return (ip, port)
@@ -119,12 +115,10 @@ def handshake(socket):
     ''' Initiates handshake with peer '''
     info_hash = getdicthash('Sapolsky.mp4.torrent')    
     msg = chr(19) + 'BitTorrent protocol' + '\x00'*8 + info_hash + '-PYOTR0-dfhmjb0skee6'
-    print ""
     print "Beginning handshake with peer"
     socket.send(msg)
     print "Handshake sent: ", repr(msg)
     print "Handshake rcvd: %s" % repr(socket.recv(4096))
-    print ""
 
 def make_have(piece):
     ''' Constructs msg for sending a 'have piece' msg to a peer '''
@@ -181,16 +175,13 @@ def receive_loop(index, socket):
             bfield = [ (True if x == '1' else False) for x in bitfield ]
             print bitfield
             time.sleep(2)
-            print ""
-            print "This peer is a seeder"
-            print ""
+            print "\nThis peer is a seeder"
             time.sleep(2)
         elif flag == 'unchoke':
             ''' If unchoked, send a request! '''
             print 'Peer unchoked us!'
             time.sleep(1)
             print 'Requesting block'
-            print ""
             socket.sendall(make_request(index, 0, 16384))
             last_req_length = 16384
             # we don't actually need this, can get from length of data. attribute it?
@@ -249,7 +240,7 @@ class PeerConnection(threading.Thread):
 ''' MAIN '''
 file_load = 'Sapolsky.mp4.torrent'
 print "Loaded", file_load
-print ""
+print
 
 piece_queue = Queue.Queue()
 metainfo = decode(file_load)
