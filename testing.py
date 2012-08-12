@@ -15,7 +15,7 @@ def recvall(socket, expected):
     while True:
         newdata = socket.recv(expected)
         data += newdata
-        expected = expected - len(newdata)
+        expected -= len(newdata)
         if expected == 0:
             break
     return data
@@ -169,19 +169,20 @@ def getdicthash(file):
 
 
 
-''' MAIN '''
+def main():
+    pieceshas = spliceshas('Sapolsky.mp4.torrent')
+    ip, port = announce('Sapolsky.mp4.torrent')
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+    s.connect((ip, 51413))
+    handshake(s)
+    first_block = receive_loop()
+    print pieceshas[0]
+    first_block = "".join(first_block)
+    first_block = sha.new(first_block).digest()
+    print first_block
 
-pieceshas = spliceshas('Sapolsky.mp4.torrent')
-ip, port = announce('Sapolsky.mp4.torrent')
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-s.connect((ip, 51413))
-handshake(s)
-first_block = receive_loop()
-print pieceshas[0]
-first_block = "".join(first_block)
-first_block = sha.new(first_block).digest()
-print first_block
-
+if __name__ == '__main__':
+    main()
 
 
 
