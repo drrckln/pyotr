@@ -7,6 +7,7 @@ import Queue
 import threading
 import time
 import random
+import os
 
 ''' Metainfo '''
 
@@ -169,14 +170,8 @@ def receive_loop(index, socket):
     while True:
         flag, data = flagmsg(socket)
         print "Message type:", flag
-        if flag == 'bitfield':
-            num = int(data.encode('hex'), 16)
-            bitfield = bin(num)[2:len(sha_list)+2]
-            bfield = [ (True if x == '1' else False) for x in bitfield ]
-            print bitfield
-            time.sleep(2)
-            print "\nThis peer is a seeder"
-            time.sleep(2)
+        if flag == 'choke':
+            print 'Peer choked us! :('
         elif flag == 'unchoke':
             ''' If unchoked, send a request! '''
             print 'Peer unchoked us!'
@@ -185,6 +180,22 @@ def receive_loop(index, socket):
             socket.sendall(make_request(index, 0, 16384))
             last_req_length = 16384
             # we don't actually need this, can get from length of data. attribute it?
+        elif flag == 'interested':
+            print "Peer wants stuff we have."
+        elif flag == 'not interested':
+            print "Peer is not interested in what we have so far."
+        elif flag == 'have':
+            print "Peer now has this piece"
+        elif flag == 'bitfield':
+            num = int(data.encode('hex'), 16)
+            bitfield = bin(num)[2:len(sha_list)+2]
+            bfield = [ (True if x == '1' else False) for x in bitfield ]
+            print bitfield
+            time.sleep(2)
+            print "\nThis peer is a seeder"
+            time.sleep(2)
+        elif flag == 'request':
+            break
         elif flag == 'piece':
             piece, offset = struct.unpack('!LL', data[:8])
             print repr(data[:20])
@@ -200,6 +211,8 @@ def receive_loop(index, socket):
             size_left = piece_data.count(None)
             socket.sendall(make_request(index, first_blank, min(16384, size_left)))
             last_req_length = min(16384, size_left)
+        elif flag == 'cancel':
+            print "Peer cancelled request for this piece"
     return piece_data
 
 
@@ -229,7 +242,7 @@ class PeerConnection(threading.Thread):
                 print ""
                 self.s.sendall(make_have(index))
                 self.piece_queue.task_done()
-            else: 
+            else:
                 print "Failed SHA1 check :("
                 print ""
                 failed = index, now_sha
@@ -247,6 +260,12 @@ metainfo = decode(file_load)
 file_size = metainfo['info']['length']
 info_hash = getdicthash(file_load)
 piece_length = metainfo['info']['piece length']
+name = metainfo['info']['name']
+# preallocates a file size... just one file though
+write_target = open(os.getcwd() + '/' + name, 'wb+')
+allocation = bytearray(file_size)
+write_target.write(allocation)
+
 
 sha_list = splice_shas(file_load)
 piece_list = zip([x for x in range(len(sha_list))], sha_list)
