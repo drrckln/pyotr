@@ -223,6 +223,7 @@ class PeerConnection(threading.Thread):
     ''' Grab blocks from peers, pulling indices off queue '''
     def __init__(self, piece_queue, ip, port):
         threading.Thread.__init__(self)
+        self.write_target = write_target
         self.piece_queue = piece_queue
         self.port = port
         self.ip = ip
@@ -240,6 +241,8 @@ class PeerConnection(threading.Thread):
             if now_sha == piece_sha:
                 print "SHA1 matches for piece", index
                 print ""
+                self.write_target.seek(index*piece_length, 0)
+                self.write_target.write(current_piece)
                 self.s.sendall(make_have(index))
                 self.piece_queue.task_done()
             else:
