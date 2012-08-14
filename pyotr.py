@@ -211,7 +211,8 @@ class PeerConnection(threading.Thread):
         handshake(self.s)
         #bitfield(self.s)
         # don't need it, can't get it right, gets us kicked
-    
+
+    def run(self):
         while not piece_queue.empty():
             index, now_sha = self.piece_queue.get()
             print index
@@ -243,6 +244,7 @@ class Writer (threading.Thread):
         self.write_target = write_target
         self.write_queue = write_queue
         self.piece_length = piece_length
+  
     def run(self):
         while True:
             if not self.write_queue.empty():
