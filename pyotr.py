@@ -206,13 +206,17 @@ class PeerConnection(threading.Thread):
         self.write_queue = write_queue
         self.port = port
         self.ip = ip
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.connect((self.ip, self.port))
-        handshake(self.s)
-        #bitfield(self.s)
-        # don't need it, can't get it right, gets us kicked
 
     def run(self):
+        try:
+            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.s.connect((self.ip, self.port))
+            handshake(self.s)
+            #bitfield(self.s)
+            # don't need it, can't get it right, gets us kicked
+        except:
+            print "Couldn't connect"
+            return
         while not piece_queue.empty():
             index, now_sha = self.piece_queue.get()
             print index
@@ -257,7 +261,7 @@ class Writer (threading.Thread):
 
 
 ''' MAIN '''
-file_load = 'kubuntu.torrent'
+file_load = 'Sapolsky.mp4.torrent'
 print "Loaded", file_load
 piece_queue = Queue.Queue()
 metainfo = decode(file_load)
