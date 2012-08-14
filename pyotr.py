@@ -134,14 +134,14 @@ def flagmsg(socket):
     data = id_data[1:]
     id_dict1 = {'\x01': 'unchoke', '\x00': 'choke', '\x03': 'not interested', '\x02': 'interested'}
     id_dict2 = {'\x05': 'bitfield', '\x04': 'have', '\x07': 'piece', '\x06': 'request', '\x08': 'cancel'}
-    if (id in id_dict1):
+    if id in id_dict1:
     	return (id_dict1[id], None)
-	else:
+    else:
 		return (id_dict2[id], data)
 
 
 def receive_loop(index, socket):
-    ''' Currently hardcodes for first data block '''
+    ''' Gets multiple blocks now '''
     if piece_queue.empty():
         piece_data = [None]*(file_size%piecelength)
     else: piece_data = [None]*piece_length
@@ -170,7 +170,7 @@ def receive_loop(index, socket):
             bitfield = bin(num)[2:len(sha_list)+2]
             bfield = [ (True if x == '1' else False) for x in bitfield ]
             print bitfield
-            time.sleep(2)
+            time.sleep(1)
             print "\nThis peer is a seeder"
             time.sleep(2)
         elif flag == 'request':
@@ -209,11 +209,18 @@ class PeerConnection(threading.Thread):
         self.s.connect((self.ip, self.port))
         handshake(self.s)
     
-    def run(self):
         while not piece_queue.empty():
             index, now_sha = self.piece_queue.get()
-            self.s.sendall(make_request(index, 0, 16384))
-            current_piece = receive_loop(index, self.s)
+            try:
+                self.s.sendall(make_request(index, 0, 16384))
+                current_piece = receive_loop(index, self.s)
+            except:
+                print "Failed connection"
+                failed = index, now_sha
+                self.piece_queue.task_done()
+                self.piece_queue.put(failed)
+                return
+                #thread.exit() also works?
             current_piece = "".join(current_piece)
             piece_sha = sha.new(current_piece).digest()
             if now_sha == piece_sha:
@@ -227,6 +234,7 @@ class PeerConnection(threading.Thread):
                 failed = index, now_sha
                 self.piece_queue.task_done()
                 self.piece_queue.put(failed)
+                
 
 
 ''' MAIN '''
