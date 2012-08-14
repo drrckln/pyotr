@@ -268,8 +268,7 @@ piece_length = metainfo['info']['piece length']
 name = metainfo['info']['name']
 # preallocates a file size... just one file though
 write_target = open(os.getcwd() + '/' + name, 'wb+')
-allocation = bytearray(file_size)
-write_target.write(allocation)
+write_target.write(bytearray(file_size))
 write_queue = Queue.Queue()
 
 sha_list = splice_shas(file_load)
