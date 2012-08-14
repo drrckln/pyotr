@@ -101,15 +101,6 @@ incomplete: {3}
     return (ip, port)
 
 
-
-
-
-
-
-
-
-
-
 ''' Peer '''
 
 def handshake(socket):
@@ -141,24 +132,12 @@ def flagmsg(socket):
         return
     id = id_data[0]
     data = id_data[1:]
-    if id == '\x00':
-        return ('choke', None)
-    elif id == '\x01':
-        return ('unchoke', None)
-    elif id == '\x02':
-        return ('interested', None)
-    elif id == '\x03':
-        return ('not interested', None)
-    elif id == '\x04':
-        return ('have', data)
-    elif id == '\x05':
-        return ('bitfield', data)
-    elif id == '\x06':
-        return ('request', data)
-    elif id == '\x07':
-        return ('piece', data)
-    elif id == '\x08':
-        return ('cancel', data)
+    id_dict1 = {'\x01': 'unchoke', '\x00': 'choke', '\x03': 'not interested', '\x02': 'interested'}
+    id_dict2 = {'\x05': 'bitfield', '\x04': 'have', '\x07': 'piece', '\x06': 'request', '\x08': 'cancel'}
+    if (id in id_dict1):
+    	return (id_dict1[id], None)
+	else:
+		return (id_dict2[id], data)
 
 
 def receive_loop(index, socket):
@@ -201,7 +180,6 @@ def receive_loop(index, socket):
             print repr(data[:20])
             print "Piece Index: ", piece 
             print "Offset:", offset
-            print ""  
             #print "Length sent:",len(data[8:])
             piece_data[offset:offset+last_req_length] = data[8:]
             if None not in piece_data:
@@ -240,14 +218,12 @@ class PeerConnection(threading.Thread):
             piece_sha = sha.new(current_piece).digest()
             if now_sha == piece_sha:
                 print "SHA1 matches for piece", index
-                print ""
                 self.write_target.seek(index*piece_length, 0)
                 self.write_target.write(current_piece)
                 self.s.sendall(make_have(index))
                 self.piece_queue.task_done()
             else:
                 print "Failed SHA1 check :("
-                print ""
                 failed = index, now_sha
                 self.piece_queue.task_done()
                 self.piece_queue.put(failed)
@@ -256,8 +232,6 @@ class PeerConnection(threading.Thread):
 ''' MAIN '''
 file_load = 'Sapolsky.mp4.torrent'
 print "Loaded", file_load
-print
-
 piece_queue = Queue.Queue()
 metainfo = decode(file_load)
 file_size = metainfo['info']['length']
