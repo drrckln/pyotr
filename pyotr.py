@@ -201,8 +201,8 @@ class PeerConnection(threading.Thread):
     ''' Grab blocks from peers, pulling indices off queue '''
     def __init__(self, piece_queue, ip, port):
         threading.Thread.__init__(self)
-        self.write_target = write_target
         self.piece_queue = piece_queue
+        self.write_queue = write_queue
         self.port = port
         self.ip = ip
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -225,8 +225,7 @@ class PeerConnection(threading.Thread):
             piece_sha = sha.new(current_piece).digest()
             if now_sha == piece_sha:
                 print "SHA1 matches for piece", index
-                self.write_target.seek(index*piece_length, 0)
-                self.write_target.write(current_piece)
+                self.write_queue.put((index, current_piece))
                 self.s.sendall(make_have(index))
                 self.piece_queue.task_done()
             else:
@@ -235,6 +234,21 @@ class PeerConnection(threading.Thread):
                 self.piece_queue.task_done()
                 self.piece_queue.put(failed)
                 
+class Writer (threading.Thread):
+    def __init__(self, write_target, write_queue, piece_length):
+        threading.Thread.__init__(self)
+        self.write_target = write_target
+        self.write_queue = write_queue
+        self.piece_length = piece_length
+    def run(self):
+        while True:
+            if not self.write_queue.empty():
+                index, current_piece = self.write_queue.get()
+                self.write_target.seek(index*piece_length, 0)
+                self.write_target.write(current_piece)
+                print "wrote a piece!"
+            if piece_queue.empty():
+                return
 
 
 ''' MAIN '''
@@ -250,11 +264,11 @@ name = metainfo['info']['name']
 write_target = open(os.getcwd() + '/' + name, 'wb+')
 allocation = bytearray(file_size)
 write_target.write(allocation)
-
+write_queue = Queue.Queue()
 
 sha_list = splice_shas(file_load)
 piece_list = zip([x for x in range(len(sha_list))], sha_list)
-random.shuffle(piece_list)
+#random.shuffle(piece_list)
 print "Pieces currently download in random order. Shuffling into queue.."
 time.sleep(1)
 for piece in piece_list:
@@ -264,6 +278,10 @@ for piece in piece_list:
 ip, port = announce(file_load)
 
 
+write_thread = Writer(write_target, write_queue, piece_length)
+write_thread.setDaemon(True)
+write_thread.start()
+
 print "Spinning up two threads. One will fail, since peer won't take two connections."
 print ""
 for i in range(2):
@@ -271,9 +289,8 @@ for i in range(2):
     t.setDaemon(True)
     t.start()
 
-
 piece_queue.join()
-
+write_thread.join()
 
 print "FILE FULLY DOWNLOADED (though not yet written)"
 
