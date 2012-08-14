@@ -153,7 +153,6 @@ def receive_loop(index, socket):
     if piece_queue.empty():
         piece_data = [None]*(file_size%piecelength)
     else: piece_data = [None]*piece_length
-    last_req_length = 16384
     while True:
         flag, data = flagmsg(socket)
         print "Message type:", flag
@@ -165,7 +164,6 @@ def receive_loop(index, socket):
             time.sleep(1)
             print 'Requesting block'
             socket.sendall(make_request(index, 0, 16384))
-            last_req_length = 16384
             # we don't actually need this, can get from length of data. attribute it?
         elif flag == 'interested':
             print "Peer wants stuff we have."
@@ -187,14 +185,11 @@ def receive_loop(index, socket):
             print "Piece Index: ", piece 
             print "Offset:", offset
             #print "Length sent:",len(data[8:])
-            piece_data[offset:offset+last_req_length] = data[8:]
+            piece_data[offset:offset+16384] = data[8:]
             if None not in piece_data:
                 print "yay! finished a piece!"
                 break
-            first_blank = piece_data.index(None)
-            size_left = piece_data.count(None)
-            socket.sendall(make_request(index, first_blank, min(16384, size_left)))
-            last_req_length = min(16384, size_left)
+            socket.sendall(make_request(index, offset+16384, 16384))
         elif flag == 'cancel':
             print "Peer cancelled request for this piece"
     return piece_data
@@ -221,7 +216,6 @@ class PeerConnection(threading.Thread):
             index, now_sha = self.piece_queue.get()
             print index
             try:
-                self.s.sendall(make_request(index, 0, 16384))
                 current_piece = receive_loop(index, self.s)
             except:
                 print "Failed connection"
