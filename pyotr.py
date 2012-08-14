@@ -93,24 +93,25 @@ incomplete: {3}
     multiple = len(data)/6
     #print struct.unpack("!" + "LH"*multiple, data)
     print "Converting 'peers' to more readable form:"
+    peer_list = []
     for i in range(0, multiple):
-        print socket.inet_ntop(socket.AF_INET, data[6*i:6*i+4]) + ":" + repr(struct.unpack("!H", data[6*i+4:6*i+6])[0])
-    print
-    ip =  socket.inet_ntop(socket.AF_INET, data[0:4])
-    port = int(repr(struct.unpack("!H", data[4:6])[0]))
-    return (ip, port)
+        peer_list.append((socket.inet_ntop(socket.AF_INET, data[6*i:6*i+4]), struct.unpack("!H", data[6*i+4:6*i+6])[0]))
+    print peer_list
+    #ip =  socket.inet_ntop(socket.AF_INET, data[0:4])
+    #port = int(repr(struct.unpack("!H", data[4:6])[0]))
+    return peer_list
 
 
 ''' Peer '''
 
 def handshake(socket):
     ''' Initiates handshake with peer '''
-    info_hash = getdicthash('Sapolsky.mp4.torrent')    
+    info_hash = getdicthash(file_load)    
     msg = chr(19) + 'BitTorrent protocol' + '\x00'*8 + info_hash + '-PYOTR0-dfhmjb0skee6'
     print "Beginning handshake with peer"
     socket.send(msg)
     print "Handshake sent: ", repr(msg)
-    print "Handshake rcvd: %s" % repr(socket.recv(4096))
+    print "Handshake rcvd: %s" % repr(socket.recv(68))
 
 def make_have(piece):
     ''' Constructs msg for sending a 'have piece' msg to a peer '''
@@ -211,6 +212,7 @@ class PeerConnection(threading.Thread):
     
         while not piece_queue.empty():
             index, now_sha = self.piece_queue.get()
+            print index
             try:
                 self.s.sendall(make_request(index, 0, 16384))
                 current_piece = receive_loop(index, self.s)
@@ -252,7 +254,7 @@ class Writer (threading.Thread):
 
 
 ''' MAIN '''
-file_load = 'Sapolsky.mp4.torrent'
+file_load = 'kubuntu.torrent'
 print "Loaded", file_load
 piece_queue = Queue.Queue()
 metainfo = decode(file_load)
@@ -262,8 +264,8 @@ piece_length = metainfo['info']['piece length']
 name = metainfo['info']['name']
 # preallocates a file size... just one file though
 write_target = open(os.getcwd() + '/' + name, 'wb+')
-allocation = bytearray(file_size)
-write_target.write(allocation)
+#allocation = bytearray(file_size)
+#write_target.write(allocation)
 write_queue = Queue.Queue()
 
 sha_list = splice_shas(file_load)
@@ -275,17 +277,17 @@ for piece in piece_list:
     piece_queue.put(piece)
 
 
-ip, port = announce(file_load)
+peer_list = announce(file_load)
 
 
 write_thread = Writer(write_target, write_queue, piece_length)
 write_thread.setDaemon(True)
 write_thread.start()
 
-print "Spinning up two threads. One will fail, since peer won't take two connections."
+print "Spinning up threads. Some will fail, since peer won't take two connections."
 print ""
-for i in range(2):
-    t = PeerConnection(piece_queue, ip, 51413)
+for (ip, port) in peer_list:
+    t = PeerConnection(piece_queue, ip, port)
     t.setDaemon(True)
     t.start()
 
