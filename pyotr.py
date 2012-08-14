@@ -119,9 +119,9 @@ def make_have(piece):
 
 def bitfield(socket):
     ''' Sends bitfield '''
-    length = len(pieces) + 1
+    length = len(pieces)/20
     print length
-    msg = struct.pack('!L', length) + chr(5) + '\x00'*(length-1)
+    msg = struct.pack('!L', length+1) + chr(5) + '\x00'*(length-1)
     socket.send(msg)
     
 def make_request(piece, offset, length):
