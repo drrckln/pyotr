@@ -16,7 +16,7 @@ def recvall(socket, expected):
         newdata = socket.recv(expected)
         data += newdata
         expected -= len(newdata)
-        if expected == 0:
+        if not expected:
             break
     return data
 
@@ -56,10 +56,13 @@ def announce(file):
 
     response = requests.get(torrent['announce'], params = payload)
     reply = bencode.bdecode(response.content)
-    print 'peers: ' + repr(reply['peers'])
-    print 'complete: ' + str(reply['complete'])
-    print 'interval: ' + str(reply['interval'])
-    print 'incomplete: ' + str(reply['incomplete'])
+    print("""
++Response received, decoded..
++peers: {0}
++complete: {1}
++interval: {2}
++incomplete: {3}
++""".format(repr(reply['peers']), reply['complete'], reply['interval'], reply['incomplete']))
     
     data = reply['peers']
     multiple = len(data)/6
@@ -98,28 +101,16 @@ def flagmsg(socket):
     first  = socket.recv(4)
     length = struct.unpack('!L', first)[0]
     id_data = recvall(socket, length)
-    if id_data == '':
+    if not id_data:
         return
     id = id_data[0]
     data = id_data[1:]
-    if id == '\x00':
-        return ('choke', None)
-    elif id == '\x01':
-        return ('unchoke', None)
-    elif id == '\x02':
-        return ('interested', None)
-    elif id == '\x03':
-        return ('not interested', None)
-    elif id == '\x04':
-        return ('have', data)
-    elif id == '\x05':
-        return ('bitfield', data)
-    elif id == '\x06':
-        return ('request', data)
-    elif id == '\x07':
-        return ('piece', data)
-    elif id == '\x08':
-        return ('cancel', data)
+    id_dict1 = {'\x01': 'unchoke', '\x00': 'choke', '\x03': 'not interested', '\x02': 'interested'}
+    id_dict2 = {'\x05': 'bitfield', '\x04': 'have', '\x07': 'piece', '\x06': 'request', '\x08': 'cancel'}
+    if (id in id_dict1):
+    	return (id_dict1[id], None)
+	else:
+		return (id_dict2[id], data)
 
 
 def receive_loop():
