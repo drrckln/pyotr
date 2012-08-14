@@ -117,7 +117,13 @@ def make_have(piece):
     ''' Constructs msg for sending a 'have piece' msg to a peer '''
     return struct.pack('!L', 5) + chr(4) + struct.pack('!L', piece)
 
-
+def bitfield(socket):
+    ''' Sends bitfield '''
+    length = len(pieces) + 1
+    print length
+    msg = struct.pack('!L', length) + chr(5) + '\x00'*(length-1)
+    socket.send(msg)
+    
 def make_request(piece, offset, length):
     ''' Constructs msg for requesting a block from a peer '''
     return struct.pack('!L', 13) + chr(6) + struct.pack('!LLL', piece, offset, length)
@@ -172,8 +178,6 @@ def receive_loop(index, socket):
             bfield = [ (True if x == '1' else False) for x in bitfield ]
             print bitfield
             time.sleep(1)
-            print "\nThis peer is a seeder"
-            time.sleep(2)
         elif flag == 'request':
             break
         elif flag == 'piece':
@@ -209,6 +213,7 @@ class PeerConnection(threading.Thread):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.connect((self.ip, self.port))
         handshake(self.s)
+        bitfield(self.s)
     
         while not piece_queue.empty():
             index, now_sha = self.piece_queue.get()
@@ -260,6 +265,7 @@ piece_queue = Queue.Queue()
 metainfo = decode(file_load)
 file_size = metainfo['info']['length']
 info_hash = getdicthash(file_load)
+pieces = metainfo['info']['pieces']
 piece_length = metainfo['info']['piece length']
 name = metainfo['info']['name']
 # preallocates a file size... just one file though
