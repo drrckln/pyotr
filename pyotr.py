@@ -117,6 +117,7 @@ def make_have(piece):
     ''' Constructs msg for sending a 'have piece' msg to a peer '''
     return struct.pack('!L', 5) + chr(4) + struct.pack('!L', piece)
 
+# the length is incorrect. why?
 def bitfield(socket):
     ''' Sends bitfield '''
     length = len(pieces)/20
@@ -213,7 +214,8 @@ class PeerConnection(threading.Thread):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.connect((self.ip, self.port))
         handshake(self.s)
-        bitfield(self.s)
+        #bitfield(self.s)
+        # don't need it, can't get it right, gets us kicked
     
         while not piece_queue.empty():
             index, now_sha = self.piece_queue.get()
