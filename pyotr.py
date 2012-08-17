@@ -148,55 +148,10 @@ def flagmsg(socket):
 		return (id_dict2[id], data)
 
 
-def receive_loop(index, socket):
-    ''' Gets multiple blocks now '''
-    if piece_queue.empty():
-        piece_data = [None]*(file_size%piecelength)
-    else: piece_data = [None]*piece_length
-    while True:
-        flag, data = flagmsg(socket)
-        print "Message type:", flag
-        if flag == 'choke':
-            print 'Peer choked us! :('
-        elif flag == 'unchoke':
-            ''' If unchoked, send a request! '''
-            print 'Peer unchoked us!'
-            time.sleep(1)
-            print 'Requesting block'
-            socket.sendall(make_request(index, 0, 16384))
-            # we don't actually need this, can get from length of data. attribute it?
-        elif flag == 'interested':
-            print "Peer wants stuff we have."
-        elif flag == 'not interested':
-            print "Peer is not interested in what we have so far."
-        elif flag == 'have':
-            print "Peer now has this piece"
-        elif flag == 'bitfield':
-            num = int(data.encode('hex'), 16)
-            bitfield = bin(num)[2:len(sha_list)+2]
-            bfield = [ (True if x == '1' else False) for x in bitfield ]
-            print bitfield
-            time.sleep(1)
-        elif flag == 'request':
-            break
-        elif flag == 'piece':
-            piece, offset = struct.unpack('!LL', data[:8])
-            print repr(data[:20])
-            print "Piece Index: ", piece 
-            print "Offset:", offset
-            #print "Length sent:",len(data[8:])
-            piece_data[offset:offset+16384] = data[8:]
-            if None not in piece_data:
-                print "yay! finished a piece!"
-                break
-            socket.sendall(make_request(index, offset+16384, 16384))
-        elif flag == 'cancel':
-            print "Peer cancelled request for this piece"
-    return piece_data
-
 
 
 ''' CLASS STUFF '''
+
 
 class PeerConnection(threading.Thread):
     ''' Grab blocks from peers, pulling indices off queue '''
@@ -207,6 +162,52 @@ class PeerConnection(threading.Thread):
         self.port = port
         self.ip = ip
 
+    def receive_loop(self, index):
+        ''' Gets multiple blocks now '''
+        if piece_queue.empty():
+            piece_data = [None]*(file_size%piecelength)
+        else: piece_data = [None]*piece_length
+        while True:
+            flag, data = flagmsg(self.s)
+            print "Message type:", flag
+            if flag == 'choke':
+                print 'Peer choked us! :('
+            elif flag == 'unchoke':
+                ''' If unchoked, send a request! '''
+                print 'Peer unchoked us!'
+                time.sleep(1)
+                print 'Requesting block'
+                self.s.sendall(make_request(index, 0, 16384))
+                # we don't actually need this, can get from length of data. attribute it?
+            elif flag == 'interested':
+                print "Peer wants stuff we have."
+            elif flag == 'not interested':
+                print "Peer is not interested in what we have so far."
+            elif flag == 'have':
+                print "Peer now has this piece"
+            elif flag == 'bitfield':
+                num = int(data.encode('hex'), 16)
+                bitfield = bin(num)[2:len(sha_list)+2]
+                bfield = [ (True if x == '1' else False) for x in bitfield ]
+                print bitfield
+                time.sleep(1)
+            elif flag == 'request':
+                break
+            elif flag == 'piece':
+                piece, offset = struct.unpack('!LL', data[:8])
+                print repr(data[:20])
+                print "Piece Index: ", piece 
+                print "Offset:", offset
+                #print "Length sent:",len(data[8:])
+                piece_data[offset:offset+16384] = data[8:]
+                if None not in piece_data:
+                    print "yay! finished a piece!"
+                    break
+                self.s.sendall(make_request(index, offset+16384, 16384))
+            elif flag == 'cancel':
+                print "Peer cancelled request for this piece"
+        return piece_data
+    
     def run(self):
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -219,9 +220,10 @@ class PeerConnection(threading.Thread):
             return
         while not piece_queue.empty():
             index, now_sha = self.piece_queue.get()
+            self.s.sendall(make_request(index, 0, 16384))
             print index
             try:
-                current_piece = receive_loop(index, self.s)
+                current_piece = self.receive_loop(index)
             except:
                 print "Failed connection"
                 failed = index, now_sha
@@ -243,6 +245,7 @@ class PeerConnection(threading.Thread):
                 self.piece_queue.put(failed)
                 
 class Writer (threading.Thread):
+    ''' Thread that writes data to disk from finished pieces queue (aka write_queue) '''
     def __init__(self, write_target, write_queue, piece_length):
         threading.Thread.__init__(self)
         self.write_target = write_target
@@ -255,7 +258,8 @@ class Writer (threading.Thread):
                 index, current_piece = self.write_queue.get()
                 self.write_target.seek(index*piece_length, 0)
                 self.write_target.write(current_piece)
-                print "wrote a piece!"
+                print "wrote a piece", index
+                self.write_queue.task_done()
             if piece_queue.empty():
                 return
 
@@ -300,6 +304,7 @@ for (ip, port) in peer_list:
 
 piece_queue.join()
 write_thread.join()
+
 
 print "FILE FULLY DOWNLOADED (though not yet written)"
 
