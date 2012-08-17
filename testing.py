@@ -81,9 +81,9 @@ def handshake(socket):
     ''' Initiates handshake with peer '''
     info_hash = getdicthash('Sapolsky.mp4.torrent')    
     msg = chr(19) + 'BitTorrent protocol' + '\x00'*8 + info_hash + '-TR2610-dfhmjb0skee6'
-    s.send(msg)
+    socket.send(msg)
     print "Handshake sent: ", repr(msg)
-    print "Handshake rcvd: %s" % repr(s.recv(4096))
+    print "Handshake rcvd: %s" % repr(socket.recv(4096))
 
 
 def make_request(piece, offset, length):
@@ -109,11 +109,11 @@ def flagmsg(socket):
     id_dict2 = {'\x05': 'bitfield', '\x04': 'have', '\x07': 'piece', '\x06': 'request', '\x08': 'cancel'}
     if (id in id_dict1):
     	return (id_dict1[id], None)
-	else:
+    else:
 		return (id_dict2[id], data)
 
 
-def receive_loop():
+def receive_loop(s):
     piece_data = [None]*131072
     while True:
         flag, data = flagmsg(s)
@@ -166,7 +166,7 @@ def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     s.connect((ip, 51413))
     handshake(s)
-    first_block = receive_loop()
+    first_block = receive_loop(s)
     print pieceshas[0]
     first_block = "".join(first_block)
     first_block = sha.new(first_block).digest()
