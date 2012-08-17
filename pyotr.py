@@ -8,6 +8,7 @@ import threading
 import time
 import random
 import os
+from dns.inet import inet_ntop
 
 ''' Metainfo '''
 
@@ -95,10 +96,8 @@ incomplete: {3}
     print "Converting 'peers' to more readable form:"
     peer_list = []
     for i in range(0, multiple):
-        peer_list.append((socket.inet_ntop(socket.AF_INET, data[6*i:6*i+4]), struct.unpack("!H", data[6*i+4:6*i+6])[0]))
+        peer_list.append((inet_ntop(2, data[6*i:6*i+4]), struct.unpack("!H", data[6*i+4:6*i+6])[0]))
     print peer_list
-    #ip =  socket.inet_ntop(socket.AF_INET, data[0:4])
-    #port = int(repr(struct.unpack("!H", data[4:6])[0]))
     return peer_list
 
 
@@ -153,7 +152,7 @@ def flagmsg(socket):
 ''' CLASS STUFF '''
 
 
-class PeerConnection(threading.Thread):
+class Peer(threading.Thread):
     ''' Grab blocks from peers, pulling indices off queue '''
     def __init__(self, piece_queue, ip, port):
         threading.Thread.__init__(self)
@@ -298,7 +297,7 @@ write_thread.start()
 print "Spinning up threads. Some will fail, since peer won't take two connections."
 print ""
 for (ip, port) in peer_list:
-    t = PeerConnection(piece_queue, ip, port)
+    t = Peer(piece_queue, ip, port)
     t.setDaemon(True)
     t.start()
 
